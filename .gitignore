@@ -1,0 +1,121 @@
+.DS_Store
+.idea/
+
+# built application files
+*.apk
+
+# files for the dex VM
+*.dex
+
+# Java class files
+*.class
+
+# generated files
+bin/
+gen/
+
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Log files
+*.log
+
+# Android Studio navigation editor temp files
+.navigation/
+
+# Android Studio captures folder
+captures/
+
+# Eclipse project files
+.classpath
+.project
+
+# Intellij files
+*.iml
+out/
+**.DS_Store
+target/
+coverage.ec
+
+# calabash files
+
+/test_servers/
+/*.png
+*.html
+cucumber.json
+*.keystore
+calabash_settings
+
+# Crashlytics
+goldstar/src/main/assets/crashlytics-build.properties
+goldstar/src/main/res/values/com_crashlytics_export_strings.xml
+
+
+# Ruby-related stuff due to fastlane
+
+# Created by https://www.gitignore.io/api/ruby
+
+### Ruby ###
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/examples.txt
+/test/tmp/
+/test/version_tmp/
+/tmp/
+
+# Used by dotenv library to load environment variables.
+# .env
+
+## Specific to RubyMotion:
+.dat*
+.repl_history
+*.bridgesupport
+build-iPhoneOS/
+build-iPhoneSimulator/
+
+## Specific to RubyMotion (use of CocoaPods):
+#
+# We recommend against adding the Pods directory to your .gitignore. However
+# you should judge for yourself, the pros and cons are mentioned at:
+# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
+#
+# vendor/Pods/
+
+## Documentation cache and generated files:
+/.yardoc/
+/_yardoc/
+/doc/
+/rdoc/
+
+## Environment normalization:
+/.bundle/
+/vendor/bundle
+/lib/bundler/man/
+
+# for a library or gem, you might want to ignore these files since the code is
+# intended to run in multiple environments; otherwise, check them in:
+# Gemfile.lock
+# .ruby-version
+# .ruby-gemset
+
+# unless supporting rvm < 1.11.0 or doing something fancy, ignore this:
+.rvmrc
+
+# End of https://www.gitignore.io/api/ruby
+
+goldstar/manifest-merger-release-report.txt
+method_count.txt
+reports/
+apk
+*Latest.md
+
+fastlane/report.xml

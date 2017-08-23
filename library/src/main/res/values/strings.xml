@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">IAP Helper</string>
+    <string name="donate">Donate</string>
+    <string-array name="donate_product_ids">
+        <item>one_dollar</item>
+        <item>two_dollars</item>
+        <item>five_dollars</item>
+        <item>ten_dollars</item>
+        <item>twenty_dollars</item>
+        <item>fifty_dollars</item>
+        <item>one_hundred_dollars</item>
+    </string-array>
+    <string name="error_donate_setup_title">IAP Error</string>
+    <string name="error_donate_setup_message">Error getting donation IAP info, try again later. (Error code %1$d: %2$s)</string>
+    <string name="donate_choose_title">Like this app? Feel free to donate!</string>
+    <string-array name="donate_names">
+        <item>\$1 USD</item>
+        <item>\$2 USD</item>
+        <item>\$5 USD</item>
+        <item>\$10 USD</item>
+        <item>\$20 USD</item>
+        <item>\$50 USD</item>
+        <item>\$100 USD</item>
+    </string-array>
+</resources>
