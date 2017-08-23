@@ -13,6 +13,6 @@ android {
 }
 
 dependencies {
-    api 'com.android.billingclient:billing:dp-1'
-    implementation 'com.android.support:appcompat-v7:26.0.1'
+    compile 'com.android.billingclient:billing:dp-1'
+    compile 'com.android.support:appcompat-v7:26.0.1'
 }
