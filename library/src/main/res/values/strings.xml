@@ -22,4 +22,6 @@
         <item>\$50 USD</item>
         <item>\$100 USD</item>
     </string-array>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
 </resources>
