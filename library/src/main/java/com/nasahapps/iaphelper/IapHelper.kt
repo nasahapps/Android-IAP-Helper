@@ -42,26 +42,28 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
                 .setType(BillingClient.SkuType.INAPP)
         billingClient.querySkuDetailsAsync(params.build()) { responseCode, skuDetailsList ->
             weakRefContext.get()?.let { activity ->
-                if (responseCode == BillingClient.BillingResponse.OK) {
-                    skuDetailsList?.let { skuDetails ->
-                        val items = SkuItem.listFromSkuDetailsList(skuDetails)
-                        AlertDialog.Builder(activity)
-                                .setTitle(R.string.donate_choose_title)
-                                .setItems(SkuItem.getArrayOfTitles(items)) { dialogInterface, position ->
-                                    weakRefContext.get()?.let {
-                                        launchBillingFlow(it, items[position].skuDetails.sku)
+                if (!activity.isFinishing) {
+                    if (responseCode == BillingClient.BillingResponse.OK) {
+                        skuDetailsList?.let { skuDetails ->
+                            val items = SkuItem.listFromSkuDetailsList(skuDetails)
+                            AlertDialog.Builder(activity)
+                                    .setTitle(R.string.donate_choose_title)
+                                    .setItems(SkuItem.getArrayOfTitles(items)) { dialogInterface, position ->
+                                        weakRefContext.get()?.let {
+                                            launchBillingFlow(it, items[position].skuDetails.sku)
+                                        }
                                     }
-                                }
-                                .setNegativeButton(R.string.cancel, null)
+                                    .setNegativeButton(R.string.cancel, null)
+                                    .show()
+                        }
+                    } else {
+                        AlertDialog.Builder(activity)
+                                .setTitle(R.string.error_donate_setup_title)
+                                .setMessage(activity.getString(R.string.error_donate_setup_message,
+                                        responseCode, getResponseMessageForCode(responseCode)))
+                                .setPositiveButton(R.string.ok, null)
                                 .show()
                     }
-                } else {
-                    AlertDialog.Builder(activity)
-                            .setTitle(R.string.error_donate_setup_title)
-                            .setMessage(activity.getString(R.string.error_donate_setup_message,
-                                    responseCode, getResponseMessageForCode(responseCode)))
-                            .setPositiveButton(R.string.ok, null)
-                            .show()
                 }
             }
         }
