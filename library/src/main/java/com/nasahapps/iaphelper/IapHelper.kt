@@ -104,7 +104,7 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
     }
 
     override fun onBillingSetupFinished(resultCode: Int) {
-        logD("Billing setup finished: " + resultCode)
+        logD("Billing setup finished: $resultCode")
         if (resultCode != BillingClient.BillingResponse.OK) {
             logE("Error setting up billing client, " + getResponseMessageForCode(resultCode))
         } else {

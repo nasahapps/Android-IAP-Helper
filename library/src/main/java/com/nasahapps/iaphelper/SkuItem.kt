@@ -22,12 +22,10 @@ internal class SkuItem(var skuDetails: SkuDetails) : Comparable<SkuItem> {
         }
 
     override fun compareTo(skuItem: SkuItem): Int {
-        return if (this.skuDetails.priceAmountMicros < skuItem.skuDetails.priceAmountMicros) {
-            -1
-        } else if (this.skuDetails.priceAmountMicros > skuItem.skuDetails.priceAmountMicros) {
-            1
-        } else {
-            0
+        return when {
+            this.skuDetails.priceAmountMicros < skuItem.skuDetails.priceAmountMicros -> -1
+            this.skuDetails.priceAmountMicros > skuItem.skuDetails.priceAmountMicros -> 1
+            else -> 0
         }
     }
 

@@ -13,7 +13,7 @@ android {
 }
 
 dependencies {
-    compile 'com.android.billingclient:billing:1.0'
-    compile 'com.android.support:appcompat-v7:27.0.2'
-    compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+    implementation 'com.android.billingclient:billing:1.0'
+    implementation 'com.android.support:appcompat-v7:27.1.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
 }
