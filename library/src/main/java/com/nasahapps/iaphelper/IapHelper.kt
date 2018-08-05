@@ -2,8 +2,8 @@ package com.nasahapps.iaphelper
 
 import android.app.Activity
 import android.content.Context
-import android.support.v7.app.AlertDialog
 import android.util.Log
+import androidx.appcompat.app.AlertDialog
 import com.android.billingclient.BuildConfig
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -12,7 +12,7 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.SkuDetailsParams
 import java.lang.ref.WeakReference
-import java.util.Arrays
+import java.util.*
 
 /**
  * Created by hhasan on 8/22/17.
@@ -32,7 +32,9 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
     fun isClientReady() = billingClient.isReady
 
     fun endConnection() {
-        billingClient.endConnection()
+        if (isClientReady()) {
+            billingClient.endConnection()
+        }
     }
 
     fun getSkuDetails(activity: Activity) {
@@ -91,7 +93,7 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
 
     private fun consumePurchase(purchaseToken: String?) {
         if (purchaseToken != null) {
-            logD("Purchase: " + purchaseToken)
+            logD("Purchase: $purchaseToken")
             logD("Consuming purchase...")
             billingClient.consumeAsync(purchaseToken) { responseCode, purchaseToken ->
                 if (responseCode == BillingClient.BillingResponse.OK) {
