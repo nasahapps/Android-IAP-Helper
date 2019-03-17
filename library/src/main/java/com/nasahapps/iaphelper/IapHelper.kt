@@ -10,6 +10,7 @@ import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
+import com.android.billingclient.api.SkuDetails
 import com.android.billingclient.api.SkuDetailsParams
 import java.lang.ref.WeakReference
 import java.util.*
@@ -50,9 +51,9 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
                             val items = SkuItem.listFromSkuDetailsList(skuDetails)
                             AlertDialog.Builder(activity)
                                     .setTitle(R.string.donate_choose_title)
-                                    .setItems(SkuItem.getArrayOfTitles(items)) { dialogInterface, position ->
+                                    .setItems(SkuItem.getArrayOfTitles(items)) { _, position ->
                                         weakRefContext.get()?.let {
-                                            launchBillingFlow(it, items[position].skuDetails.sku)
+                                            launchBillingFlow(it, items[position].skuDetails)
                                         }
                                     }
                                     .setNegativeButton(R.string.cancel, null)
@@ -71,10 +72,9 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
         }
     }
 
-    private fun launchBillingFlow(activity: Activity, sku: String) {
+    private fun launchBillingFlow(activity: Activity, skuDetails: SkuDetails) {
         val params = BillingFlowParams.newBuilder()
-                .setSku(sku)
-                .setType(BillingClient.SkuType.INAPP)
+                .setSkuDetails(skuDetails)
                 .build()
         billingClient.launchBillingFlow(activity, params)
     }
@@ -95,9 +95,9 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
         if (purchaseToken != null) {
             logD("Purchase: $purchaseToken")
             logD("Consuming purchase...")
-            billingClient.consumeAsync(purchaseToken) { responseCode, purchaseToken ->
+            billingClient.consumeAsync(purchaseToken) { responseCode, token ->
                 if (responseCode == BillingClient.BillingResponse.OK) {
-                    logD("Purchase $purchaseToken consumed")
+                    logD("Purchase $token consumed")
                 } else {
                     logE("Error consuming purchase: " + getResponseMessageForCode(responseCode))
                 }
