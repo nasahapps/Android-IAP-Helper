@@ -1,13 +1,12 @@
 package com.nasahapps.iaphelper
 
 import com.android.billingclient.api.SkuDetails
-import java.util.Collections
 
 /**
  * Created by hhasan on 8/22/17.
  */
 
-internal class SkuItem(var skuDetails: SkuDetails) : Comparable<SkuItem> {
+internal data class SkuItem(var skuDetails: SkuDetails) : Comparable<SkuItem> {
 
     val title: String
         get() = when {
@@ -21,10 +20,10 @@ internal class SkuItem(var skuDetails: SkuDetails) : Comparable<SkuItem> {
             else -> skuDetails.title
         }
 
-    override fun compareTo(skuItem: SkuItem): Int {
+    override fun compareTo(other: SkuItem): Int {
         return when {
-            this.skuDetails.priceAmountMicros < skuItem.skuDetails.priceAmountMicros -> -1
-            this.skuDetails.priceAmountMicros > skuItem.skuDetails.priceAmountMicros -> 1
+            this.skuDetails.priceAmountMicros < other.skuDetails.priceAmountMicros -> -1
+            this.skuDetails.priceAmountMicros > other.skuDetails.priceAmountMicros -> 1
             else -> 0
         }
     }
@@ -32,9 +31,7 @@ internal class SkuItem(var skuDetails: SkuDetails) : Comparable<SkuItem> {
     companion object {
 
         fun listFromSkuDetailsList(detailsList: List<SkuDetails>): List<SkuItem> {
-            val list = detailsList.map { SkuItem(it) }
-            Collections.sort(list)
-            return list
+            return detailsList.map { SkuItem(it) }.sorted()
         }
 
         fun getArrayOfTitles(items: List<SkuItem>): Array<String> {

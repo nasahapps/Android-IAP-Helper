@@ -4,57 +4,64 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.OnLifecycleEvent
 import com.android.billingclient.BuildConfig
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
+import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.ConsumeParams
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.SkuDetails
 import com.android.billingclient.api.SkuDetailsParams
-import java.lang.ref.WeakReference
 import java.util.*
 
 /**
  * Created by hhasan on 8/22/17.
  */
 
-class IapHelper(context: Context, private val callbacks: Callbacks? = null) : PurchasesUpdatedListener,
+class IapHelper(context: Context,
+                private val lifecycle: Lifecycle,
+                private val statusCallback: (Boolean, Int) -> Unit) : PurchasesUpdatedListener,
         BillingClientStateListener {
 
     private val billingClient = BillingClient.newBuilder(context)
+            .enablePendingPurchases()
             .setListener(this)
             .build()
+    val isClientReady: Boolean
+        get() = billingClient.isReady
 
-    init {
+    @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
+    fun startConnection() {
+        logD("Starting billing client connection...")
         billingClient.startConnection(this)
     }
 
-    fun isClientReady() = billingClient.isReady
-
+    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     fun endConnection() {
-        if (isClientReady()) {
+        if (isClientReady) {
+            logD("Ending billing client connection...")
             billingClient.endConnection()
         }
     }
 
     fun getSkuDetails(activity: Activity) {
-        val weakRefContext = WeakReference(activity)
-        val params = SkuDetailsParams.newBuilder()
-                .setSkusList(Arrays.asList(*activity.resources.getStringArray(R.array.donate_product_ids)))
-                .setType(BillingClient.SkuType.INAPP)
-        billingClient.querySkuDetailsAsync(params.build()) { responseCode, skuDetailsList ->
-            weakRefContext.get()?.let { activity ->
-                if (!activity.isFinishing) {
-                    if (responseCode == BillingClient.BillingResponse.OK) {
+        if (isLifecycleValid()) {
+            val params = SkuDetailsParams.newBuilder()
+                    .setSkusList(Arrays.asList(*activity.resources.getStringArray(R.array.donate_product_ids)))
+                    .setType(BillingClient.SkuType.INAPP)
+            billingClient.querySkuDetailsAsync(params.build()) { result, skuDetailsList ->
+                if (isLifecycleValid()) {
+                    if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
                         skuDetailsList?.let { skuDetails ->
                             val items = SkuItem.listFromSkuDetailsList(skuDetails)
                             AlertDialog.Builder(activity)
                                     .setTitle(R.string.donate_choose_title)
                                     .setItems(SkuItem.getArrayOfTitles(items)) { _, position ->
-                                        weakRefContext.get()?.let {
-                                            launchBillingFlow(it, items[position].skuDetails)
-                                        }
+                                        launchBillingFlow(activity, items[position].skuDetails)
                                     }
                                     .setNegativeButton(R.string.cancel, null)
                                     .show()
@@ -63,7 +70,7 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
                         AlertDialog.Builder(activity)
                                 .setTitle(R.string.error_donate_setup_title)
                                 .setMessage(activity.getString(R.string.error_donate_setup_message,
-                                        responseCode, getResponseMessageForCode(responseCode)))
+                                        result?.responseCode, getResponseMessageForBillingResult(result)))
                                 .setPositiveButton(R.string.ok, null)
                                 .show()
                     }
@@ -73,58 +80,69 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
     }
 
     private fun launchBillingFlow(activity: Activity, skuDetails: SkuDetails) {
-        val params = BillingFlowParams.newBuilder()
-                .setSkuDetails(skuDetails)
-                .build()
-        billingClient.launchBillingFlow(activity, params)
-    }
-
-    override fun onPurchasesUpdated(responseCode: Int, purchases: List<Purchase>?) {
-        if (responseCode != BillingClient.BillingResponse.OK) {
-            logE("Error making purchase: " + getResponseMessageForCode(responseCode))
-        }
-        logD("Purchases updated: $responseCode, $purchases")
-        if (purchases != null) {
-            for (purchase in purchases) {
-                consumePurchase(purchase.purchaseToken)
-            }
+        if (isLifecycleValid()) {
+            val params = BillingFlowParams.newBuilder()
+                    .setSkuDetails(skuDetails)
+                    .build()
+            billingClient.launchBillingFlow(activity, params)
         }
     }
 
-    private fun consumePurchase(purchaseToken: String?) {
-        if (purchaseToken != null) {
-            logD("Purchase: $purchaseToken")
+    override fun onPurchasesUpdated(billingResult: BillingResult?,
+                                    purchases: MutableList<Purchase>?) {
+        if (billingResult?.responseCode != BillingClient.BillingResponseCode.OK) {
+            logE("Error making purchase: " + getResponseMessageForBillingResult(billingResult))
+        }
+        logD("Purchases updated: ${billingResult?.responseCode}, $purchases")
+        purchases?.forEach {
+            val consumeParams = ConsumeParams.newBuilder()
+                    .setPurchaseToken(it.purchaseToken)
+                    .build()
+            consumePurchase(consumeParams)
+        }
+    }
+
+    private fun consumePurchase(consumeParams: ConsumeParams?) {
+        if (consumeParams != null) {
+            logD("Consume params: $consumeParams")
             logD("Consuming purchase...")
-            billingClient.consumeAsync(purchaseToken) { responseCode, token ->
-                if (responseCode == BillingClient.BillingResponse.OK) {
+            billingClient.consumeAsync(consumeParams) { result, token ->
+                if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
                     logD("Purchase $token consumed")
                 } else {
-                    logE("Error consuming purchase: " + getResponseMessageForCode(responseCode))
+                    logE("Error consuming purchase: " + getResponseMessageForBillingResult(result))
                 }
             }
         }
     }
 
-    override fun onBillingSetupFinished(resultCode: Int) {
-        logD("Billing setup finished: $resultCode")
-        if (resultCode != BillingClient.BillingResponse.OK) {
-            logE("Error setting up billing client, " + getResponseMessageForCode(resultCode))
+    override fun onBillingSetupFinished(billingResult: BillingResult?) {
+        logD("Billing setup finished: ${billingResult?.responseCode}")
+        if (billingResult?.responseCode != BillingClient.BillingResponseCode.OK) {
+            logE("Error setting up billing client, " + getResponseMessageForBillingResult(billingResult))
         } else {
             // Consume any leftover purchases
             billingClient.queryPurchaseHistoryAsync(BillingClient.SkuType.INAPP) { responseCode, purchasesList ->
-                if (responseCode == BillingClient.BillingResponse.OK) {
-                    purchasesList?.forEach { consumePurchase(it.purchaseToken) }
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    purchasesList?.forEach {
+                        val consumeParams = ConsumeParams.newBuilder()
+                                .setPurchaseToken(it.purchaseToken)
+                                .build()
+                        consumePurchase(consumeParams)
+                    }
                 } else {
-                    logE("Error getting purchase history: " + getResponseMessageForCode(responseCode))
+                    logE("Error getting purchase history: " + getResponseMessageForBillingResult(responseCode))
                 }
             }
         }
-        callbacks?.onBillingSetupFinished(resultCode)
+
+        statusCallback(billingResult?.responseCode == BillingClient.BillingResponseCode.OK,
+                billingResult?.responseCode ?: BillingClient.BillingResponseCode.ERROR)
     }
 
     override fun onBillingServiceDisconnected() {
         logD("Billing service disconnected")
-        callbacks?.onBillingServiceDisconnected()
+        statusCallback(false, BillingClient.BillingResponseCode.SERVICE_DISCONNECTED)
     }
 
     private fun logD(log: String) {
@@ -139,35 +157,30 @@ class IapHelper(context: Context, private val callbacks: Callbacks? = null) : Pu
         }
     }
 
-    private fun getResponseMessageForCode(code: Int): String {
-        val result: String
-        when (code) {
-            BillingClient.BillingResponse.BILLING_UNAVAILABLE -> {
-                result = "Billing API version is not supported for the type requested"
+    private fun getResponseMessageForBillingResult(result: BillingResult?): String {
+        return when (result?.responseCode) {
+            BillingClient.BillingResponseCode.OK -> "Transaction successful"
+            BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
+                "Billing API version is not supported for the type requested"
             }
-            BillingClient.BillingResponse.SERVICE_UNAVAILABLE -> result = "Network connection is down"
-            BillingClient.BillingResponse.DEVELOPER_ERROR -> {
-                result = "Invalid arguments provided to the API, or this app is not properly setup " +
+            BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE -> "Network connection is down"
+            BillingClient.BillingResponseCode.DEVELOPER_ERROR -> {
+                "Invalid arguments provided to the API, or this app is not properly setup " +
                         "for IAP, or does not have the necessary permissions in the manifest"
             }
-            BillingClient.BillingResponse.FEATURE_NOT_SUPPORTED -> {
-                result = "IAP feature not supported on the current device"
+            BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED -> {
+                "In-app purchases are not supported on this device"
             }
-            BillingClient.BillingResponse.ITEM_ALREADY_OWNED -> result = "IAP item already owned"
-            BillingClient.BillingResponse.ITEM_NOT_OWNED -> result = "IAP item not owned"
-            BillingClient.BillingResponse.ITEM_UNAVAILABLE -> result = "IAP item unavailable for purchase"
-            BillingClient.BillingResponse.SERVICE_DISCONNECTED -> result = "Billing service disconnected"
-            BillingClient.BillingResponse.USER_CANCELED -> result = "User cancelled IAP process"
-            BillingClient.BillingResponse.ERROR -> result = "Fatal error"
-            else -> result = "Unknown error"
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> "IAP item already owned"
+            BillingClient.BillingResponseCode.ITEM_NOT_OWNED -> "IAP item not owned"
+            BillingClient.BillingResponseCode.ITEM_UNAVAILABLE -> "IAP item unavailable for purchase"
+            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> "Billing service disconnected"
+            BillingClient.BillingResponseCode.USER_CANCELED -> "User cancelled IAP process"
+            BillingClient.BillingResponseCode.ERROR -> "Fatal error"
+            BillingClient.BillingResponseCode.SERVICE_TIMEOUT -> "Billing service timed out"
+            else -> "Unknown error"
         }
-
-        return result
     }
 
-    interface Callbacks {
-        fun onBillingSetupFinished(resultCode: Int)
-
-        fun onBillingServiceDisconnected()
-    }
+    private fun isLifecycleValid() = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 }
