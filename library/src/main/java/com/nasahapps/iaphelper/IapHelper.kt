@@ -4,8 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.OnLifecycleEvent
+import androidx.lifecycle.LifecycleOwner
 import com.android.billingclient.BuildConfig
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
@@ -23,25 +24,32 @@ import java.util.*
  */
 
 class IapHelper(context: Context,
-                private val lifecycle: Lifecycle,
+                lifecycle: Lifecycle,
                 private val statusCallback: (Boolean, Int) -> Unit) : PurchasesUpdatedListener,
-        BillingClientStateListener {
+        BillingClientStateListener, DefaultLifecycleObserver {
 
-    private val billingClient = BillingClient.newBuilder(context)
+    private val billingClient = BillingClient.newBuilder(context.applicationContext)
             .enablePendingPurchases()
             .setListener(this)
             .build()
     val isClientReady: Boolean
         get() = billingClient.isReady
+    private var isLifecycleValid = false
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
-    fun startConnection() {
+    init {
+        lifecycle.addObserver(this)
+    }
+
+    override fun onCreate(owner: LifecycleOwner) {
+        super.onCreate(owner)
+        isLifecycleValid = true
         logD("Starting billing client connection...")
         billingClient.startConnection(this)
     }
 
-    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-    fun endConnection() {
+    override fun onDestroy(owner: LifecycleOwner) {
+        super.onDestroy(owner)
+        isLifecycleValid = false
         if (isClientReady) {
             logD("Ending billing client connection...")
             billingClient.endConnection()
@@ -49,12 +57,12 @@ class IapHelper(context: Context,
     }
 
     fun getSkuDetails(activity: Activity) {
-        if (isLifecycleValid()) {
+        if (isLifecycleValid) {
             val params = SkuDetailsParams.newBuilder()
                     .setSkusList(Arrays.asList(*activity.resources.getStringArray(R.array.donate_product_ids)))
                     .setType(BillingClient.SkuType.INAPP)
             billingClient.querySkuDetailsAsync(params.build()) { result, skuDetailsList ->
-                if (isLifecycleValid()) {
+                if (isLifecycleValid) {
                     if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
                         skuDetailsList?.let { skuDetails ->
                             val items = SkuItem.listFromSkuDetailsList(skuDetails)
@@ -80,7 +88,7 @@ class IapHelper(context: Context,
     }
 
     private fun launchBillingFlow(activity: Activity, skuDetails: SkuDetails) {
-        if (isLifecycleValid()) {
+        if (isLifecycleValid) {
             val params = BillingFlowParams.newBuilder()
                     .setSkuDetails(skuDetails)
                     .build()
@@ -181,6 +189,4 @@ class IapHelper(context: Context,
             else -> "Unknown error"
         }
     }
-
-    private fun isLifecycleValid() = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
 }
