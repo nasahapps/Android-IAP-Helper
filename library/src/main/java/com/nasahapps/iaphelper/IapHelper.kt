@@ -40,8 +40,8 @@ class IapHelper(context: Context,
         lifecycle.addObserver(this)
     }
 
-    override fun onCreate(owner: LifecycleOwner) {
-        super.onCreate(owner)
+    override fun onResume(owner: LifecycleOwner) {
+        super.onResume(owner)
         isLifecycleValid = true
         logD("Starting billing client connection...")
         billingClient.startConnection(this)
