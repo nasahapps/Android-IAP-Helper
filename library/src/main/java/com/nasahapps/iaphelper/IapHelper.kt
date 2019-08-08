@@ -40,8 +40,8 @@ class IapHelper(context: Context,
         lifecycle.addObserver(this)
     }
 
-    override fun onResume(owner: LifecycleOwner) {
-        super.onResume(owner)
+    override fun onCreate(owner: LifecycleOwner) {
+        super.onCreate(owner)
         isLifecycleValid = true
         logD("Starting billing client connection...")
         billingClient.startConnection(this)
@@ -59,7 +59,7 @@ class IapHelper(context: Context,
     fun getSkuDetails(activity: Activity) {
         if (isLifecycleValid) {
             val params = SkuDetailsParams.newBuilder()
-                    .setSkusList(Arrays.asList(*activity.resources.getStringArray(R.array.donate_product_ids)))
+                    .setSkusList(listOf(*activity.resources.getStringArray(R.array.donate_product_ids)))
                     .setType(BillingClient.SkuType.INAPP)
             billingClient.querySkuDetailsAsync(params.build()) { result, skuDetailsList ->
                 if (isLifecycleValid) {
