@@ -30,13 +30,11 @@ internal data class SkuItem(var skuDetails: SkuDetails) : Comparable<SkuItem> {
 
     companion object {
 
-        fun listFromSkuDetailsList(detailsList: List<SkuDetails>): List<SkuItem> {
-            return detailsList.map { SkuItem(it) }.sorted()
-        }
-
         fun getArrayOfTitles(items: List<SkuItem>): Array<String> {
             return items.map { it.title }.toTypedArray()
         }
 
     }
 }
+
+internal fun List<SkuDetails>.toSkuItemList() = map { SkuItem(it) }.sorted()

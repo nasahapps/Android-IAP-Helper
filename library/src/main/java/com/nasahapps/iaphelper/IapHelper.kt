@@ -17,7 +17,6 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.SkuDetails
 import com.android.billingclient.api.SkuDetailsParams
-import java.util.*
 
 /**
  * Created by hhasan on 8/22/17.
@@ -65,7 +64,7 @@ class IapHelper(context: Context,
                 if (isLifecycleValid) {
                     if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
                         skuDetailsList?.let { skuDetails ->
-                            val items = SkuItem.listFromSkuDetailsList(skuDetails)
+                            val items = skuDetails.toSkuItemList()
                             AlertDialog.Builder(activity)
                                     .setTitle(R.string.donate_choose_title)
                                     .setItems(SkuItem.getArrayOfTitles(items)) { _, position ->
