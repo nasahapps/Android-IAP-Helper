@@ -7,7 +7,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
-import com.android.billingclient.BuildConfig
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
@@ -17,6 +16,16 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.SkuDetails
 import com.android.billingclient.api.SkuDetailsParams
+import com.android.billingclient.api.consumePurchase
+import com.android.billingclient.api.queryPurchaseHistory
+import com.android.billingclient.api.querySkuDetails
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Created by hhasan on 8/22/17.
@@ -25,7 +34,7 @@ import com.android.billingclient.api.SkuDetailsParams
 class IapHelper(context: Context,
                 lifecycle: Lifecycle,
                 private val statusCallback: (Boolean, Int) -> Unit) : PurchasesUpdatedListener,
-        BillingClientStateListener, DefaultLifecycleObserver {
+        BillingClientStateListener, DefaultLifecycleObserver, CoroutineScope by MainScope() {
 
     private val billingClient = BillingClient.newBuilder(context.applicationContext)
             .enablePendingPurchases()
@@ -49,6 +58,7 @@ class IapHelper(context: Context,
     override fun onDestroy(owner: LifecycleOwner) {
         super.onDestroy(owner)
         isLifecycleValid = false
+        coroutineContext.cancelChildren()
         if (isClientReady) {
             logD("Ending billing client connection...")
             billingClient.endConnection()
@@ -57,30 +67,35 @@ class IapHelper(context: Context,
 
     fun getSkuDetails(activity: Activity) {
         if (isLifecycleValid) {
-            val params = SkuDetailsParams.newBuilder()
-                    .setSkusList(listOf(*activity.resources.getStringArray(R.array.donate_product_ids)))
-                    .setType(BillingClient.SkuType.INAPP)
-            billingClient.querySkuDetailsAsync(params.build()) { result, skuDetailsList ->
-                if (isLifecycleValid) {
-                    if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
-                        skuDetailsList?.let { skuDetails ->
-                            val items = skuDetails.toSkuItemList()
+            launch {
+                try {
+                    val params = SkuDetailsParams.newBuilder()
+                            .setSkusList(listOf(*activity.resources.getStringArray(R.array.donate_product_ids)))
+                            .setType(BillingClient.SkuType.INAPP)
+                    val result = withContext(Dispatchers.IO) { billingClient.querySkuDetails(params.build()) }
+                    if (isActive) {
+                        if (result.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                            result.skuDetailsList?.let { skuDetails ->
+                                val items = skuDetails.toSkuItemList()
+                                AlertDialog.Builder(activity)
+                                        .setTitle(R.string.donate_choose_title)
+                                        .setItems(SkuItem.getArrayOfTitles(items)) { _, position ->
+                                            launchBillingFlow(activity, items[position].skuDetails)
+                                        }
+                                        .setNegativeButton(R.string.cancel, null)
+                                        .show()
+                            }
+                        } else {
                             AlertDialog.Builder(activity)
-                                    .setTitle(R.string.donate_choose_title)
-                                    .setItems(SkuItem.getArrayOfTitles(items)) { _, position ->
-                                        launchBillingFlow(activity, items[position].skuDetails)
-                                    }
-                                    .setNegativeButton(R.string.cancel, null)
+                                    .setTitle(R.string.error_donate_setup_title)
+                                    .setMessage(activity.getString(R.string.error_donate_setup_message,
+                                            result.billingResult.responseCode, getResponseMessageForBillingResult(result.billingResult)))
+                                    .setPositiveButton(R.string.ok, null)
                                     .show()
                         }
-                    } else {
-                        AlertDialog.Builder(activity)
-                                .setTitle(R.string.error_donate_setup_title)
-                                .setMessage(activity.getString(R.string.error_donate_setup_message,
-                                        result?.responseCode, getResponseMessageForBillingResult(result)))
-                                .setPositiveButton(R.string.ok, null)
-                                .show()
                     }
+                } catch (e: Throwable) {
+                    logE("Error querying sku details: ${e.localizedMessage}")
                 }
             }
         }
@@ -102,23 +117,28 @@ class IapHelper(context: Context,
         }
         logD("Purchases updated: ${billingResult?.responseCode}, $purchases")
         purchases?.forEach {
-            val consumeParams = ConsumeParams.newBuilder()
-                    .setPurchaseToken(it.purchaseToken)
-                    .build()
-            consumePurchase(consumeParams)
+            launch {
+                try {
+                    val consumeParams = ConsumeParams.newBuilder()
+                            .setPurchaseToken(it.purchaseToken)
+                            .build()
+                    consumePurchase(consumeParams)
+                } catch (e: Throwable) {
+                    logE("Error consuming purchase: ${e.localizedMessage}")
+                }
+            }
         }
     }
 
-    private fun consumePurchase(consumeParams: ConsumeParams?) {
+    private suspend fun consumePurchase(consumeParams: ConsumeParams?) = withContext(Dispatchers.IO) {
         if (consumeParams != null) {
             logD("Consume params: $consumeParams")
             logD("Consuming purchase...")
-            billingClient.consumeAsync(consumeParams) { result, token ->
-                if (result?.responseCode == BillingClient.BillingResponseCode.OK) {
-                    logD("Purchase $token consumed")
-                } else {
-                    logE("Error consuming purchase: " + getResponseMessageForBillingResult(result))
-                }
+            val result = billingClient.consumePurchase(consumeParams)
+            if (result.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                logD("Purchase ${result.purchaseToken} consumed")
+            } else {
+                logE("Error consuming purchase: " + getResponseMessageForBillingResult(result.billingResult))
             }
         }
     }
@@ -129,16 +149,21 @@ class IapHelper(context: Context,
             logE("Error setting up billing client, " + getResponseMessageForBillingResult(billingResult))
         } else {
             // Consume any leftover purchases
-            billingClient.queryPurchaseHistoryAsync(BillingClient.SkuType.INAPP) { responseCode, purchasesList ->
-                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                    purchasesList?.forEach {
-                        val consumeParams = ConsumeParams.newBuilder()
-                                .setPurchaseToken(it.purchaseToken)
-                                .build()
-                        consumePurchase(consumeParams)
+            launch {
+                try {
+                    val result = withContext(Dispatchers.IO) { billingClient.queryPurchaseHistory(BillingClient.SkuType.INAPP) }
+                    if (result.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                        result.purchaseHistoryRecordList?.forEach {
+                            val consumeParams = ConsumeParams.newBuilder()
+                                    .setPurchaseToken(it.purchaseToken)
+                                    .build()
+                            consumePurchase(consumeParams)
+                        }
+                    } else {
+                        logE("Error getting purchase history: " + getResponseMessageForBillingResult(result.billingResult))
                     }
-                } else {
-                    logE("Error getting purchase history: " + getResponseMessageForBillingResult(responseCode))
+                } catch (e: Throwable) {
+                    logE("Error getting purchase history: ${e.localizedMessage}")
                 }
             }
         }
@@ -166,25 +191,25 @@ class IapHelper(context: Context,
 
     private fun getResponseMessageForBillingResult(result: BillingResult?): String {
         return when (result?.responseCode) {
+            BillingClient.BillingResponseCode.SERVICE_TIMEOUT -> "Billing service timed out"
+            BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED -> {
+                "In-app purchases are not supported on this device"
+            }
+            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> "Billing service disconnected"
             BillingClient.BillingResponseCode.OK -> "Transaction successful"
+            BillingClient.BillingResponseCode.USER_CANCELED -> "User cancelled IAP process"
+            BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE -> "Network connection is down"
             BillingClient.BillingResponseCode.BILLING_UNAVAILABLE -> {
                 "Billing API version is not supported for the type requested"
             }
-            BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE -> "Network connection is down"
+            BillingClient.BillingResponseCode.ITEM_UNAVAILABLE -> "IAP item unavailable for purchase"
             BillingClient.BillingResponseCode.DEVELOPER_ERROR -> {
                 "Invalid arguments provided to the API, or this app is not properly setup " +
                         "for IAP, or does not have the necessary permissions in the manifest"
             }
-            BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED -> {
-                "In-app purchases are not supported on this device"
-            }
+            BillingClient.BillingResponseCode.ERROR -> "Fatal error"
             BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> "IAP item already owned"
             BillingClient.BillingResponseCode.ITEM_NOT_OWNED -> "IAP item not owned"
-            BillingClient.BillingResponseCode.ITEM_UNAVAILABLE -> "IAP item unavailable for purchase"
-            BillingClient.BillingResponseCode.SERVICE_DISCONNECTED -> "Billing service disconnected"
-            BillingClient.BillingResponseCode.USER_CANCELED -> "User cancelled IAP process"
-            BillingClient.BillingResponseCode.ERROR -> "Fatal error"
-            BillingClient.BillingResponseCode.SERVICE_TIMEOUT -> "Billing service timed out"
             else -> "Unknown error"
         }
     }

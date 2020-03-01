@@ -4,7 +4,7 @@ apply plugin: "kotlin-android"
 android {
     compileSdkVersion 29
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion 29
         versionCode 1
         versionName "1.0"
@@ -18,9 +18,10 @@ android {
 }
 
 dependencies {
-    api "com.android.billingclient:billing:2.0.3"
+    api "com.android.billingclient:billing:2.1.0"
+    api "com.android.billingclient:billing-ktx:2.1.0"
     implementation "androidx.appcompat:appcompat:1.1.0"
-    implementation "androidx.lifecycle:lifecycle-runtime:2.1.0"
-    implementation "androidx.lifecycle:lifecycle-common-java8:2.1.0"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.2.0"
+    implementation "androidx.lifecycle:lifecycle-common-java8:2.2.0"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 }
